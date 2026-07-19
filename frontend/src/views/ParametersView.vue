@@ -1,6 +1,6 @@
 <script setup>
 import {ref, onMounted} from 'vue'
-import {auth} from '../firebase.js'
+import { apiFetch } from '../api.js'
 
 const parameters = ref([])
 const loading = ref(false)
@@ -20,11 +20,7 @@ async function loadParameters(){
   error.value = ''
 
   try {
-    const token = await auth.currentUser.getIdToken()
-    
-    const res = await fetch('http://localhost:3000/parameters', {
-      headers: {Authorization: `Bearer ${token}`}
-    })
+    const res = await apiFetch('/parameters')
 
     if(!res.ok){
       throw new Error(`Request failed: ${res.status}`)
@@ -48,20 +44,9 @@ async function addParameters(){
   }
 
   try {
-    const token = await auth.currentUser.getIdToken()
-
-    const res = await fetch('http://localhost:3000/parameters', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        key: newKey.value,
-        value: newValue.value,
-        type: 'string',
-        description: newDescription.value
-      })
+    const res = await apiFetch('/parameters', {
+      method: "POST",
+      body: JSON.stringify({key: newKey.value, value: newValue.value, type: 'string', description: newDescription.value})
     })
 
     if(res.status === 409){
@@ -104,18 +89,9 @@ async function saveEdit(param){
   missing.value = false
 
   try {
-    const token = await auth.currentUser.getIdToken()
-
-    const res = await fetch(`http://localhost:3000/parameters/${param.key}`, {
+    const res = await apiFetch(`/parameters/${param.key}`, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        value: editValue.value,
-        expectedVersion: param.version
-      })
+      body: JSON.stringify({value: editValue.value, expectedVersion: param.version})
     })
 
     if(res.status === 409){
