@@ -4,8 +4,8 @@ export async function checkFirestore(req, res){
     try {
         const data = await pingFirestore()
         res.json({success: true, data})
-    } catch (error) {
-        console.error("Firestore healthcheck failed:", error)
-        res.status(500).json({success: false, error: error.message})
+    } catch (err) {
+        console.error("Firestore healthcheck failed:", err)
+        res.status(500).json({success: false, error: err.message})
     }
 }

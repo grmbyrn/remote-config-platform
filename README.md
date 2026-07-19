@@ -47,10 +47,10 @@ Three actors: **app managers** (panel), **mobile clients** (serving API), and th
 
 Two separate trust models, enforced by two separate middleware functions:
 
-| Caller | Credential | Middleware |
-|---|---|---|
+| Caller          | Credential                                        | Middleware            |
+| --------------- | ------------------------------------------------- | --------------------- |
 | Panel (manager) | Firebase ID token, sent in `Authorization` header | `requireFirebaseAuth` |
-| Mobile client | Static API token, sent in `Authorization` header | `requireApiToken` |
+| Mobile client   | Static API token, sent in `Authorization` header  | `requireApiToken`     |
 
 `requireFirebaseAuth` verifies the token via the Firebase Admin SDK and attaches the decoded token to `req.user` — the source of the `updatedBy` field on every write, so a client never supplies its own identity.
 
@@ -71,7 +71,12 @@ Firestore collection `parameters`, one document per parameter, keyed by the para
     "TR": { "value": "2.2", "updatedAt": "...", "updatedBy": "..." }
   },
   "suggestions": {
-    "DE": { "value": "2.1", "model": "gpt-4o-mini", "generatedAt": "...", "status": "pending" }
+    "DE": {
+      "value": "2.1",
+      "model": "gpt-4o-mini",
+      "generatedAt": "...",
+      "status": "pending"
+    }
   }
 }
 ```
@@ -85,6 +90,7 @@ Optimistic locking via the `version` field, checked inside a Firestore transacti
 ### Country audience resolution
 
 Given a parameter document and an optional `country` query parameter:
+
 1. Normalize the country code.
 2. If `countryOverrides[country]` exists, return it.
 3. Otherwise, return the default `value`.
@@ -103,24 +109,47 @@ The mobile-facing `GET /config` endpoint reads from an in-memory config compiled
 
 ## Implementation status
 
-| Area | Status |
-|---|---|
-| Firebase Auth (panel login) | ✅ Working end-to-end |
-| Firestore connectivity (Admin SDK) | ✅ Confirmed read/write |
-| Vue routing (`/`, `/signin`) | ✅ Working, protected by auth guard |
-| Parameters CRUD (backend + panel) | 🔲 In progress |
-| Concurrency control (implemented, not just designed) | 🔲 Planned |
-| Country audience UI + logic | 🔲 Planned |
-| AI-assisted suggestion flow | 🔲 Planned |
-| Mobile-facing serving endpoint | 🔲 Planned |
-| Responsive/mobile panel layout | 🔲 Planned |
-| Deployment (live URLs) | 🔲 Planned |
+| Area                                                 | Status                                       |
+| ---------------------------------------------------- | -------------------------------------------- |
+| Firebase Auth (panel login)                          | ✅ Working end-to-end                        |
+| Firestore connectivity (Admin SDK)                   | ✅ Confirmed read/write                      |
+| Vue routing (`/`, `/signin`)                         | ✅ Working, protected by auth guard          |
+| Parameters CRUD (backend + panel)                    | 🔲 Backend complete; panel has no delete UI  |
+| Concurrency control (implemented, not just designed) | ✅ Version-checked `PUT`, recoverable 409 UX |
+| Country audience UI + logic                          | 🔲 Planned                                   |
+| AI-assisted suggestion flow                          | 🔲 Planned                                   |
+| Mobile-facing serving endpoint                       | 🔲 Planned                                   |
+| Responsive/mobile panel layout                       | 🔲 Planned                                   |
+| Deployment (live URLs)                               | 🔲 Planned                                   |
+
+---
+
+## Known limitations
+
+Deliberate scope decisions, recorded so they read as choices rather than oversights.
+
+**Deletes are not version-checked.** `PUT` uses optimistic locking; `DELETE` does not. The
+interleaving that matters — deleting a parameter while another manager edits it — is already
+safe: the update transaction checks existence before the version, so the in-flight edit gets a
+`404` rather than resurrecting the document. A version check on delete would only guard against
+removing a recently-edited parameter, which is a judgment call rather than a lost update.
+Adding `expectedVersion` to `DELETE` is a natural extension.
+
+**Parameter `type` is immutable.** `PUT` accepts `value` only. Country overrides and AI
+suggestions are both validated against a parameter's `type`, so changing it would strand
+existing data that no longer matches its own schema. Delete and recreate is the honest
+migration path.
+
+**`description` cannot be edited after creation.** This one is a gap rather than a design
+choice — a typo in a description is currently permanent. It would flow through the same
+version-checked transaction as a value edit if added.
 
 ---
 
 ## Getting started
 
 ### Prerequisites
+
 - Node.js (v20+)
 - A Firebase project with Authentication (Email/Password) and Firestore enabled
 - A Firebase service account key (for the backend)
@@ -138,6 +167,7 @@ cd ../backend && npm install
 ### Environment variables
 
 **`backend/.env`** (see `backend/.env.example`):
+
 ```
 PORT=3000
 FIREBASE_PROJECT_ID=
@@ -146,6 +176,7 @@ FIREBASE_PRIVATE_KEY=
 ```
 
 **`frontend/.env`** (see `frontend/.env.example`):
+
 ```
 VITE_FIREBASE_API_KEY=
 VITE_FIREBASE_AUTH_DOMAIN=

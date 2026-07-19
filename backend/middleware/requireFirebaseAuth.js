@@ -12,7 +12,7 @@ export async function requireFirebaseAuth(req, res, next) {
         const decoded = await getAuth().verifyIdToken(token)
         req.user = decoded
         next()
-    } catch (error) {
+    } catch (err) {
         return res.status(401).json({error: 'Invalid or expired token'})
     }
 }

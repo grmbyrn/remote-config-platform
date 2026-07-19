@@ -1,16 +1,16 @@
-import { listParameters, createParameter, updateParameter } from "../services/parameters.js";
+import { listParameters, createParameter, updateParameter, deleteParameter } from "../services/parameters.js";
 
-export async function getParameters(req, res){
+export async function getParametersHandler(req, res){
     try {
         const parameters = await listParameters()
         res.json(parameters)
-    } catch (error) {
+    } catch (err) {
         console.error('Failed to list parameters:', err)
         res.status(500).json({error: 'Failed to load parameters'})
     }
 }
 
-export async function postParameter(req, res) {
+export async function postParameterHandler(req, res) {
     const {key, value, type, description} = req.body
 
     if(!key || !type){
@@ -21,15 +21,15 @@ export async function postParameter(req, res) {
         const created = await createParameter({key, value, type, description})
         res.status(201).json(created)
     } catch (err) {
-        if(err.code === 6){
-            return res.status(409).json({error: `Parameter '${key}`})
+        if(err.code === 'ALREADY_EXISTS'){
+            return res.status(409).json({error: err.message})
         }
         console.error('Failed to create parameter:', err)
         res.status(500).json({error: 'Failed to create parameter'})
     }
 }
 
-export async function putParameter(req, res) {
+export async function putParameterHandler(req, res) {
     const {key} = req.params
     const {value, expectedVersion} = req.body
 
@@ -59,5 +59,20 @@ export async function putParameter(req, res) {
         }
         console.error('Failed to update parameter:', err)
         res.status(500).json({error: 'Failed to update parameter'})
+    }
+}
+
+export async function deleteParameterHandler(req, res){
+    const {key} = req.params
+
+    try {
+        await deleteParameter({key})
+        res.status(204).send()
+    } catch (err) {
+        if(err.code === 'NOT_FOUND'){
+            return res.status(404).json({error: err.message})
+        }
+        console.error('Failed to delete parameter:', err)
+        res.status(500).json({error: 'Failed to delete parameter'})
     }
 }

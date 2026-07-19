@@ -12,6 +12,8 @@ const createError = ref('')
 const editingKey = ref(null)
 const editValue = ref('')
 const editError = ref('')
+const conflict = ref(null)
+const missing = ref(false)
 
 async function loadParameters(){
   loading.value = true
@@ -63,7 +65,7 @@ async function addParameters(){
     })
 
     if(res.status === 409){
-      createError.value = `A parameter named "${newKey.value} already exists."`
+      createError.value = `A parameter named "${newKey.value}" already exists.`
       return
     }
 
@@ -85,15 +87,21 @@ function startEdit(param){
   editingKey.value = param.key
   editValue.value = param.value
   editError.value = ''
+  conflict.value = null
+  missing.value = false
 }
 
 function cancelEdit(){
   editingKey.value = null
   editError.value = ''
+  conflict.value = null
+  missing.value = false
 }
 
 async function saveEdit(param){
   editError.value = ''
+  conflict.value = null
+  missing.value = false
 
   try {
     const token = await auth.currentUser.getIdToken()
@@ -111,7 +119,19 @@ async function saveEdit(param){
     })
 
     if(res.status === 409){
-      editError.value = 'This parameter was changed by someone else.'
+      const body = await res.json()
+
+      param.value = body.current.value
+      param.version = body.current.version
+      param.updatedBy = body.current.updatedBy
+      param.updatedAt = body.current.updatedAt
+
+      conflict.value = {param, current: body.current}
+      return
+    }
+
+    if(res.status === 404){
+      missing.value = true
       return
     }
 
@@ -125,6 +145,17 @@ async function saveEdit(param){
     console.error('Failed to update parameter:', err)
     editError.value = 'Could not update parameter.'
   }
+}
+
+function useTheirs(){
+  conflict.value = null
+  editingKey.value = null
+}
+
+async function refreshAfterDelete(){
+  missing.value = false
+  editingKey.value = null
+  await loadParameters()
 }
 
 onMounted(loadParameters)
@@ -180,9 +211,45 @@ onMounted(loadParameters)
     </table>
     <p v-if="createError">{{ createError }}</p>
     <p v-if="editError">{{ editError }}</p>
+
+    <div v-if="conflict" class="backdrop">
+      <div class="dialog">
+        <h3>"{{ conflict.param.key }}" was changed</h3>
+        <p>
+          {{ conflict.current.updatedBy || 'Someone else' }} saved a new value
+          <span v-if="conflict.current.updatedAt">at {{ conflict.current.updatedAt }}</span>
+        </p>
+        <p>Their value: {{ conflict.current.value }}</p>
+        <p>Your value: {{ editValue }}</p>
+        <button @click="saveEdit(conflict.param)">Re-apply mine</button>
+        <button @click="useTheirs">Use theirs</button>
+      </div>
+    </div>
+
+    <div v-if="missing" class="backdrop">
+      <div class="dialog">
+        <h3>Parameter deleted</h3>
+        <p>This parameter was deleted by someone else.</p>
+        <button @click="refreshAfterDelete">Refresh list</button>
+      </div>
+    </div>
   </div>
 </template>
 
 <style scoped>
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: grid;
+  place-items: center;
+}
 
+.dialog {
+  background: #1e2235;
+  color: #fff;
+  padding: 24px;
+  border-radius: 8px;
+  max-width: 480px;
+}
 </style>
