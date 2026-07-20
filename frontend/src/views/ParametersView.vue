@@ -15,6 +15,21 @@ const editError = ref('')
 const conflict = ref(null)
 const missing = ref(false)
 
+const dateFormat = new Intl.DateTimeFormat('en-GB', {
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+})
+
+function formatDate(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? '' : dateFormat.format(d).replace(',', '')
+}
+
 async function loadParameters(){
   loading.value = true
   error.value = ''
@@ -138,11 +153,11 @@ onMounted(loadParameters)
 </script>
 
 <template>
-  <div>
+  <div class="page">
     <p v-if="loading"> Loading...</p>
     <p v-else-if="error">{{ error }}</p>
 
-    <table v-if="!loading && !error">
+    <table v-if="!loading && !error" class="table">
       <thead>
         <tr>
           <th>Parameter Key</th>
@@ -159,13 +174,13 @@ onMounted(loadParameters)
             <span v-else>{{ param.value }}</span>
           </td>
           <td>{{ param.description }}</td>
-          <td>{{ param.createdAt }}</td>
+          <td>{{ formatDate(param.createdAt) }}</td>
           <td>
             <template v-if="editingKey === param.key">
               <button @click="saveEdit(param)">Save</button>
               <button @click="cancelEdit">Cancel</button>
             </template>
-            <button v-else @click="startEdit(param)">Edit</button>
+            <button v-else @click="startEdit(param)" class="btn btn-edit">Edit</button>
           </td>
         </tr>
         <tr>
@@ -180,7 +195,7 @@ onMounted(loadParameters)
           </td>
           <td></td>
           <td>
-            <button @click="addParameters">ADD</button>
+            <button @click="addParameters" class="btn btn-add">ADD</button>
           </td>
         </tr>
       </tbody>
@@ -213,6 +228,41 @@ onMounted(loadParameters)
 </template>
 
 <style scoped>
+.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: var(--space-7) var(--gutter);
+}
+
+.table{
+  width: 100%;
+  max-width: 1828px;
+  border-collapse: collapse;
+}
+
+th{
+  text-align: left;
+}
+
+.btn {
+  height: var(--btn-height);
+  padding: 0 18px;
+  border-radius: 4px;
+  color: #fff;
+  font-size: var(--text-base);
+  font-weight: 700;
+  transition: filter var(--transition);
+}
+
+.btn:hover { filter: brightness(1.08); }
+
+.btn-edit   { background: var(--btn-edit); }
+.btn-delete { background: var(--btn-delete); }
+.btn-add    { background: var(--btn-add); }
+
 .backdrop {
   position: fixed;
   inset: 0;
