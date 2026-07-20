@@ -9,3 +9,11 @@ export function isValidValue(type, value){
         default: return false
     }
 }
+
+export function assertValidValue(type, value){
+    if(!isValidValue(type, value)){
+        const err = new Error(`Value does not match type '${type}'`)
+        err.code = 'INVALID_VALUE'
+        throw err
+    }
+}

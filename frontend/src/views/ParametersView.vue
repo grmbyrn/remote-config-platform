@@ -1,6 +1,7 @@
 <script setup>
-import {ref, onMounted} from 'vue'
+import {ref, onMounted, computed} from 'vue'
 import { apiFetch } from '../api.js'
+import TypedValueInput from '../components/TypedValueInput.vue'
 
 const parameters = ref([])
 const loading = ref(false)
@@ -14,6 +15,10 @@ const editValue = ref('')
 const editError = ref('')
 const conflict = ref(null)
 const missing = ref(false)
+const newType = ref('string')
+const newValueValid = ref(true)
+const formKey = ref(0)
+const sortAsc = ref(true)
 
 const dateFormat = new Intl.DateTimeFormat('en-GB', {
   day: '2-digit',
@@ -23,6 +28,14 @@ const dateFormat = new Intl.DateTimeFormat('en-GB', {
   minute: '2-digit',
   hourCycle: 'h23',
 })
+
+const sortedParameters = computed(() => 
+  [...parameters.value].sort((a, b) => {
+    const cmp = new Date(a.createdAt) - new Date(b.createdAt)
+    return sortAsc.value ? cmp : -cmp
+  }))
+
+function toggleSort(){ sortAsc.value = !sortAsc.value}
 
 function formatDate(iso) {
   if (!iso) return ''
@@ -53,7 +66,7 @@ async function loadParameters(){
 async function addParameters(){
   createError.value = ''
 
-  if(!newKey.value || !newValue.value){
+  if(!newKey.value || !newValueValid.value){
     createError.value = 'Key and value are required.'
     return
   }
@@ -61,7 +74,7 @@ async function addParameters(){
   try {
     const res = await apiFetch('/parameters', {
       method: "POST",
-      body: JSON.stringify({key: newKey.value, value: newValue.value, type: 'string', description: newDescription.value})
+      body: JSON.stringify({key: newKey.value, value: newValue.value, type: newType.value, description: newDescription.value})
     })
 
     if(res.status === 409){
@@ -76,6 +89,8 @@ async function addParameters(){
     newKey.value = ''
     newValue.value = ''
     newDescription.value = ''
+    newType.value = 'string'
+    formKey.value++
     await loadParameters()
   } catch (err) {
     console.error('Failed to create parameter:', err)
@@ -163,11 +178,13 @@ onMounted(loadParameters)
           <th>Parameter Key</th>
           <th>Value</th>
           <th>Description</th>
-          <th>Create Date</th>
+          <th @click="toggleSort" style="cursor: pointer;">
+            Create Date {{ sortAsc ? '↓' : '↑' }}
+          </th>
         </tr>
       </thead>
       <tbody>
-        <tr v-for="param in parameters" :key="param.key">
+        <tr v-for="param in sortedParameters" :key="param.key">
           <td>{{ param.key }}</td>
           <td>
             <input type="text" v-if="editingKey === param.key" v-model="editValue" />
@@ -185,13 +202,26 @@ onMounted(loadParameters)
         </tr>
         <tr>
           <td>
-            <input type="text" v-model="newKey" placeholder="New Parameter">
+            <input type="text" class="field" v-model="newKey" placeholder="New Parameter">
           </td>
           <td>
-            <input type="text" v-model="newValue" placeholder="New Value">
+            <div class="value-cell">
+              <select v-model="newType" class="field field-type">
+                <option value="string">string</option>
+                <option value="number">number</option>
+                <option value="boolean">boolean</option>
+                <option value="json">json</option>
+              </select>
+              <TypedValueInput
+                :key="formKey"
+                :type="newType"
+                v-model="newValue"
+                @update:valid="newValueValid = $event"
+              />
+            </div>
           </td>
           <td>
-            <input type="text" v-model="newDescription" placeholder="New Description">
+            <input type="text" class="field" v-model="newDescription" placeholder="New Description">
           </td>
           <td></td>
           <td>
@@ -278,4 +308,15 @@ th{
   border-radius: 8px;
   max-width: 480px;
 }
+
+.value-cell {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+.field-type { width: auto; flex: 0 0 auto; }   /* select stays compact */
+.value-cell .typed-input { flex: 1; }           /* value input fills the rest */
+
+/* let the create row breathe like the design */
+td { padding: var(--space-2) var(--space-3) var(--space-2) 0; }
 </style>

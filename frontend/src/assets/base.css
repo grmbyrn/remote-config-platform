@@ -105,3 +105,32 @@ button {
   cursor: pointer;
   border: none;
 }
+
+.field {
+  width: 100%;
+  height: var(--input-height);
+  padding: 0 14px;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-input);
+  color: var(--text);
+  font-size: var(--text-base);
+}
+.field::placeholder { color: var(--placeholder); }
+.field:focus { outline: none; border-color: var(--input-border-focus); }
+
+/* select needs its native chrome removed to match */
+select.field {
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  padding-right: 30px;
+}
+
+/* json textarea grows instead of a fixed line */
+textarea.field {
+  height: auto;
+  min-height: var(--input-height);
+  padding: 10px 14px;
+  resize: vertical;
+}

@@ -1,4 +1,4 @@
-import { isValidValue } from "../lib/validate.js";
+import { assertValidValue } from "../lib/validate.js";
 import { db } from "./firestore.js";
 import { FieldValue } from "firebase-admin/firestore";
 
@@ -45,6 +45,8 @@ export async function listParameters() {
 }
 
 export async function createParameter({key, value, type, description}) {
+    assertValidValue(type, value)
+    
     const ref = db.collection('parameters').doc(key)
 
     try {     
@@ -70,10 +72,13 @@ export async function createParameter({key, value, type, description}) {
 export async function updateParameter({key, value, expectedVersion, updatedBy}){
     return updateWithVersionCheck({
         key, expectedVersion, updatedBy,
-        apply: ({current}) => ({
-            fields: {value},
-            result: {...current, value}
-        })
+        apply: ({current}) => {
+            assertValidValue(current.type, value)
+            return {
+                fields: {value},
+                result: {...current, value}
+            }
+        }
     })
 }
 
@@ -99,11 +104,7 @@ export async function setCountryOverride({key, country, value, expectedVersion, 
     return updateWithVersionCheck({
         key, expectedVersion, updatedBy,
         apply: ({current, updatedAt}) => {
-            if(!isValidValue(current.type, value)){
-                const err = new Error(`Value does not match type '${current.type}'`)
-                err.code = 'INVALID_VALUE'
-                throw err
-            }
+            assertValidValue(current.type, value)
             return {
                 fields: {[`countryOverrides.${country}`]: {value, updatedAt, updatedBy}},
                 result: {country, value}

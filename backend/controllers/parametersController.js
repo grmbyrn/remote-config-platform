@@ -6,6 +6,9 @@ export async function getParametersHandler(req, res){
         const parameters = await listParameters()
         res.json(parameters)
     } catch (err) {
+        if(err.code === 'INVALID_VALUE'){
+            return res.status(400).json({error: err.message})
+        }
         console.error('Failed to list parameters:', err)
         res.status(500).json({error: 'Failed to load parameters'})
     }
@@ -24,6 +27,9 @@ export async function postParameterHandler(req, res) {
     } catch (err) {
         if(err.code === 'ALREADY_EXISTS'){
             return res.status(409).json({error: err.message})
+        }
+        if(err.code === 'INVALID_VALUE'){
+            return res.status(400).json({error: err.message})
         }
         console.error('Failed to create parameter:', err)
         res.status(500).json({error: 'Failed to create parameter'})
@@ -57,6 +63,9 @@ export async function putParameterHandler(req, res) {
         }
         if(err.code === 'VERSION_CONFLICT'){
             return res.status(409).json({error: 'Version conflict', current: err.current})
+        }
+        if(err.code === 'INVALID_VALUE'){
+            return res.status(400).json({error: err.message})
         }
         console.error('Failed to update parameter:', err)
         res.status(500).json({error: 'Failed to update parameter'})
@@ -144,6 +153,9 @@ export async function deleteOverrideHandler(req, res) {
         }
         if(err.code === 'VERSION_CONFLICT'){
             return res.status(409).json({error: 'Version conflict', current: err.current})
+        }
+        if(err.code === 'INVALID_VALUE'){
+            return res.status(400).json({error: err.message})
         }
         console.error('Failed to remove country override:', err)
         res.status(500).json({error: 'Failed to remove country override'})
