@@ -118,9 +118,9 @@ The mobile-facing `GET /config` endpoint reads from an in-memory config compiled
 | Concurrency control (implemented, not just designed) | ✅ Version-checked `PUT`, recoverable 409 UX |
 | Country audience UI + logic                          | 🔲 Planned                                   |
 | AI-assisted suggestion flow                          | 🔲 Planned                                   |
-| Mobile-facing serving endpoint                       | 🔲 Planned                                   |
+| Mobile-facing serving endpoint                       | ✅ Token-protected `GET /config`, live cache |
 | Responsive/mobile panel layout                       | 🔲 Planned                                   |
-| Deployment (live URLs)                               | 🔲 Planned                                   |
+| Deployment (live URLs)                               | ✅ Cloud Run + Firebase Hosting              |
 
 ---
 
@@ -128,21 +128,12 @@ The mobile-facing `GET /config` endpoint reads from an in-memory config compiled
 
 Deliberate scope decisions, recorded so they read as choices rather than oversights.
 
-**Deletes are not version-checked.** `PUT` uses optimistic locking; `DELETE` does not. The
-interleaving that matters — deleting a parameter while another manager edits it — is already
-safe: the update transaction checks existence before the version, so the in-flight edit gets a
-`404` rather than resurrecting the document. A version check on delete would only guard against
-removing a recently-edited parameter, which is a judgment call rather than a lost update.
+**Deletes are not version-checked.** `PUT` uses optimistic locking; `DELETE` does not. The interleaving that matters, deleting a parameter while another manager edits it, is already safe: the update transaction checks existence before the version, so the in-flight edit gets a `404` rather than resurrecting the document. A version check on delete would only guard against removing a recently-edited parameter, which is a judgment call rather than a lost update.
 Adding `expectedVersion` to `DELETE` is a natural extension.
 
-**Parameter `type` is immutable.** `PUT` accepts `value` only. Country overrides and AI
-suggestions are both validated against a parameter's `type`, so changing it would strand
-existing data that no longer matches its own schema. Delete and recreate is the honest
-migration path.
+**Parameter `type` is immutable.** `PUT` accepts `value` only. Country overrides and AI suggestions are both validated against a parameter's `type`, so changing it would strand existing data that no longer matches its own schema. Delete and recreate is the honest migration path.
 
-**`description` cannot be edited after creation.** This one is a gap rather than a design
-choice — a typo in a description is currently permanent. It would flow through the same
-version-checked transaction as a value edit if added.
+**`description` cannot be edited after creation.** This one is a gap rather than a design choice, a typo in a description is currently permanent. It would flow through the same version-checked transaction as a value edit if added.
 
 ---
 
@@ -202,7 +193,48 @@ npm run dev   # http://localhost:5173
 
 ## Deployment
 
-_To be filled in once deployed — will include live Cloud Run and Firebase Hosting URLs._
+**Panel:** https://codeway-config-panel-beb48.web.app
+**API:** https://codeway-config-api-2972348380.europe-west1.run.app
+
+Both halves deploy independently. To deploy with your own credentials:
+
+### Backend — Cloud Run
+
+Config is passed as environment variables, not a mounted key file. Copy
+`backend/.env.example` to `backend/env.yaml` in Cloud Run's YAML format and fill
+in your service account values, then:
+
+```bash
+cd backend
+gcloud run deploy codeway-config-api \
+  --source . \
+  --region europe-west1 \
+  --allow-unauthenticated \
+  --env-vars-file env.yaml
+```
+
+`FRONTEND_ORIGIN` must match your deployed panel origin or CORS will reject the
+panel's requests. `API_TOKEN` is required — the server refuses to start without
+it.
+
+### Frontend — Firebase Hosting
+
+```bash
+cd frontend
+# .env.production holds VITE_API_BASE_URL, pointing at your Cloud Run URL
+npm run build
+firebase deploy --only hosting
+```
+
+Set the Firebase project in `.firebaserc`, and add your Hosting domain to
+Firebase Authentication's authorized domains or sign-in will fail in production.
+
+### Verifying the serving endpoint
+
+```bash
+curl -H "Authorization: Bearer $API_TOKEN" \
+  https://codeway-config-api-2972348380.europe-west1.run.app/config
+```
 
 ---
 
