@@ -5,7 +5,8 @@ let config = {}
 function buildConfig(snapshot){
     const next = {}
     for(const doc of snapshot.docs){
-        next[doc.id] = doc.data().value
+        const data = doc.data()
+        next[doc.id] = {value: data.value, countryOverrides: data.countryOverrides || {}}
     }
     return next
 }
