@@ -1,5 +1,5 @@
 <script setup>
-import {ref, watch} from 'vue'
+import {ref, watch, onMounted} from 'vue'
 
 const props = defineProps({
     modelValue: {},
@@ -14,6 +14,10 @@ watch(() => props.type, () => {
     raw.value = props.type === 'boolean' ? false : ''
     emitValue()
 })
+
+function seed(val){
+    raw.value = props.type === 'boolean' ? !!val : (val ?? '')
+}
 
 function emitValue(){
     let value, valid = true
@@ -35,6 +39,11 @@ function emitValue(){
     emit('update:modelValue', value)
     emit('update:valid', valid)
 }
+
+onMounted(() => {
+    seed(props.modelValue)
+    emitValue()
+})
 </script>
 
 <template>

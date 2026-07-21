@@ -19,6 +19,12 @@ const newType = ref('string')
 const newValueValid = ref(true)
 const formKey = ref(0)
 const sortAsc = ref(true)
+const overrideError = ref('')
+const overridesFor = ref(null)
+const overrideCountry = ref('')
+const overrideValue = ref('')
+const overrideValueValid = ref(true)
+const overrideKey = ref(0)
 
 const dateFormat = new Intl.DateTimeFormat('en-GB', {
   day: '2-digit',
@@ -132,7 +138,7 @@ async function saveEdit(param){
       param.updatedBy = body.current.updatedBy
       param.updatedAt = body.current.updatedAt
 
-      conflict.value = {param, current: body.current}
+      conflict.value = {param, current: body.current, retry: () => saveEdit(param), attempted: editValue.value}
       return
     }
 
@@ -164,6 +170,103 @@ async function refreshAfterDelete(){
   await loadParameters()
 }
 
+async function saveOverride(param, country, value){
+  overrideError.value = ''
+  conflict.value = null
+  missing.value = false
+
+  try {
+    const res = await apiFetch(`/parameters/${param.key}/overrides/${country}`, {
+      method: 'PUT',
+      body: JSON.stringify({value, expectedVersion: param.version})
+    })
+
+    if(res.status === 409){
+      const body = await res.json()
+      param.value = body.current.value
+      param.version = body.current.version
+      param.updatedBy = body.current.updatedBy
+      param.updatedAt = body.current.updatedAt
+      conflict.value = {param, current: body.current, retry: () => saveOverride(param, country, value), attempted: value}
+      return
+    }
+
+    if(res.status === 404){ missing.value = true; return }
+    if(!res.ok) throw new Error(`Request failed: ${res.status}`)
+
+    await loadParameters()
+    overridesFor.value = parameters.value.find(p => p.key === param.key) ?? null
+    overrideCountry.value = ''
+    overrideValue.value = ''
+    overrideKey.value++
+  } catch (err) {
+    console.error('Failed to set override:', err)
+    overrideError.value = 'Could not save override'
+  }
+}
+
+async function removeOverride(param, country){
+  overrideError.value = ''
+  conflict.value = null
+  missing.value = false
+
+  try {
+    const res = await apiFetch(`/parameters/${param.key}/overrides/${country}`, {
+      method: 'DELETE',
+      body: JSON.stringify({expectedVersion: param.version})
+    })
+
+    if(res.status === 409){
+      const body = await res.json()
+      param.value = body.current.value
+      param.version = body.current.version
+      param.updatedBy = body.current.updatedBy
+      param.updatedAt = body.current.updatedAt
+      conflict.value = {param, current: body.current, retry: () => removeOverride(param, country)}
+      return
+    }
+
+    if(res.status === 404){missing.value = true; return}
+    if(!res.ok) throw new Error(`Request failed: ${res.status}`)
+
+    await loadParameters()
+    overridesFor.value = parameters.value.find(p => p.key === param.key) ?? null
+  } catch (err) {
+    console.error('Failed to remove override:', err)
+    overrideError.value = 'Could not remove override.'
+  }
+}
+
+function openOverrides(param){
+  overridesFor.value = param
+  overrideCountry.value = ''
+  overrideValue.value = ''
+  overrideValueValid.value = true
+  overrideError.value = ''
+  conflict.value = null
+  missing.value = false
+  overrideKey.value++
+}
+
+function closeOverrides(){
+  overridesFor.value = null
+  overrideError.value = ''
+}
+
+function editOverride(country, entry){
+  overrideCountry.value = country
+  overrideValue.value = entry.value
+  overrideKey.value++
+}
+
+async function submitOverride(){
+  if(!overrideCountry.value || !overrideValueValid.value){
+    overrideError.value = 'Country and a valid value are required'
+    return
+  }
+  await saveOverride(overridesFor.value, overrideCountry.value, overrideValue.value)
+}
+
 onMounted(loadParameters)
 </script>
 
@@ -187,17 +290,20 @@ onMounted(loadParameters)
         <tr v-for="param in sortedParameters" :key="param.key">
           <td>{{ param.key }}</td>
           <td>
-            <input type="text" v-if="editingKey === param.key" v-model="editValue" />
+            <input type="text" v-if="editingKey === param.key" v-model="editValue" class="field" />
             <span v-else>{{ param.value }}</span>
           </td>
           <td>{{ param.description }}</td>
           <td>{{ formatDate(param.createdAt) }}</td>
           <td>
             <template v-if="editingKey === param.key">
-              <button @click="saveEdit(param)">Save</button>
-              <button @click="cancelEdit">Cancel</button>
+              <button @click="saveEdit(param)" class="btn btn-edit">Save</button>
+              <button @click="cancelEdit" class="btn btn-override">Cancel</button>
             </template>
-            <button v-else @click="startEdit(param)" class="btn btn-edit">Edit</button>
+            <template v-else>
+              <button @click="startEdit(param)" class="btn btn-edit">Edit</button>
+              <button @click="openOverrides(param)" class="btn btn-override">Override</button>
+            </template>
           </td>
         </tr>
         <tr>
@@ -233,7 +339,7 @@ onMounted(loadParameters)
     <p v-if="createError">{{ createError }}</p>
     <p v-if="editError">{{ editError }}</p>
 
-    <div v-if="conflict" class="backdrop">
+    <div v-if="conflict" class="backdrop backdrop-top">
       <div class="dialog">
         <h3>"{{ conflict.param.key }}" was changed</h3>
         <p>
@@ -241,18 +347,46 @@ onMounted(loadParameters)
           <span v-if="conflict.current.updatedAt">at {{ conflict.current.updatedAt }}</span>
         </p>
         <p>Their value: {{ conflict.current.value }}</p>
-        <p>Your value: {{ editValue }}</p>
-        <button @click="saveEdit(conflict.param)">Re-apply mine</button>
-        <button @click="useTheirs">Use theirs</button>
+        <p>Your value: {{ conflict.attempted }}</p>
+        <button @click="conflict.retry()" class="btn btn-add">Re-apply mine</button>
+        <button @click="useTheirs" class="btn btn-override">Use theirs</button>
       </div>
     </div>
 
-    <div v-if="missing" class="backdrop">
+    <div v-if="missing" class="backdrop backdrop-top">
       <div class="dialog">
         <h3>Parameter deleted</h3>
         <p>This parameter was deleted by someone else.</p>
-        <button @click="refreshAfterDelete">Refresh list</button>
+        <button @click="refreshAfterDelete" class="btn btn-add">Refresh list</button>
       </div>
+    </div>
+  </div>
+
+  <div v-if="overridesFor" class="backdrop">
+    <div class="dialog">
+      <h3>Country overrides - {{ overridesFor.key }}</h3>
+      <p>Default value: {{ overridesFor.value }}</p>
+
+      <div v-if="overridesFor.countryOverrides && Object.keys(overridesFor.countryOverrides).length">
+        <div v-for="(entry, country) in overridesFor.countryOverrides" :key="country" class="override-row">
+          <span>{{ country }} → {{ entry.value }}</span>
+          <button @click="editOverride(country, entry)" class="btn btn-edit">Edit</button>
+          <button @click="removeOverride(overridesFor, country)" class="btn btn-delete">Remove</button>
+        </div>
+      </div>
+      <p v-else>No overrides yet.</p>
+
+      <input v-model="overrideCountry" placeholder="Country (e.g: TR)" maxlength="2" class="field" type="text">
+      <TypedValueInput
+        :key="overrideKey"
+        :type="overridesFor.type"
+        v-model="overrideValue"
+        @update:valid="overrideValueValid = $event"
+      />
+      <button @click="submitOverride" class="btn btn-add">Save override</button>
+
+      <p v-if="overrideError">{{ overrideError }}</p>
+      <button @click="closeOverrides" class="btn btn-override">Close</button>
     </div>
   </div>
 </template>
@@ -293,13 +427,38 @@ th{
 .btn-delete { background: var(--btn-delete); }
 .btn-add    { background: var(--btn-add); }
 
+.btn-override {
+  background: transparent;
+  border: 1px solid var(--input-border);
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.btn-override:hover {
+  border-color: var(--input-border-focus);
+  color: var(--text);
+  filter: none;
+}
+
+.override-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+.override-row span { margin-right: auto; }
+
+.dialog .field { margin-bottom: var(--space-3); }
+
 .backdrop {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.5);
   display: grid;
   place-items: center;
+  z-index: 10;
 }
+
+.backdrop-top { z-index: 20; }
 
 .dialog {
   background: #1e2235;
@@ -308,6 +467,9 @@ th{
   border-radius: 8px;
   max-width: 480px;
 }
+
+.dialog > button { margin-top: var(--space-3); }
+.dialog > button + button { margin-left: var(--space-2); }
 
 .value-cell {
   display: flex;
