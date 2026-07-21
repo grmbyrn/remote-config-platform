@@ -116,8 +116,8 @@ The mobile-facing `GET /config` endpoint reads from an in-memory config compiled
 | Vue routing (`/`, `/signin`)                         | ✅ Working, protected by auth guard          |
 | Parameters CRUD (backend + panel)                    | 🔲 Backend complete; panel has no delete UI  |
 | Concurrency control (implemented, not just designed) | ✅ Version-checked `PUT`, recoverable 409 UX |
-| Country audience UI + logic                          | 🔲 Planned                                   |
-| AI-assisted suggestion flow                          | 🔲 Planned                                   |
+| Country audience UI + logic                          | ✅ Override modal + audience resolution      |
+| AI-assisted suggestion flow                          | ✅ Generate + review (approve/edit/reject)   |
 | Mobile-facing serving endpoint                       | ✅ Token-protected `GET /config`, live cache |
 | Responsive/mobile panel layout                       | 🔲 Planned                                   |
 | Deployment (live URLs)                               | ✅ Cloud Run + Firebase Hosting              |

@@ -25,6 +25,13 @@ const overrideCountry = ref('')
 const overrideValue = ref('')
 const overrideValueValid = ref(true)
 const overrideKey = ref(0)
+const suggestCountries = ref('')
+const generating = ref(false)
+const suggestError = ref('')
+const editingSuggestion = ref(null)
+const suggestionValue = ref('')
+const suggestionValueValid = ref(true)
+const suggestionKey = ref(0)
 
 const dateFormat = new Intl.DateTimeFormat('en-GB', {
   day: '2-digit',
@@ -259,12 +266,103 @@ function editOverride(country, entry){
   overrideKey.value++
 }
 
+function startEditSuggestion(country, entry){
+  editingSuggestion.value = country
+  suggestionValue.value = entry.value
+  suggestionKey.value++
+}
+
+function cancelEditSuggestion() { editingSuggestion.value = null }
+
 async function submitOverride(){
   if(!overrideCountry.value || !overrideValueValid.value){
     overrideError.value = 'Country and a valid value are required'
     return
   }
   await saveOverride(overridesFor.value, overrideCountry.value, overrideValue.value)
+}
+
+async function generateSuggestions(param){
+  suggestError.value = ''
+  const countries = suggestCountries.value
+    .split(',').map(c => c.trim().toUpperCase()).filter(Boolean)
+  if(!countries.length){
+    suggestError.value = 'Enter at least one country code.'
+    return
+  }
+  generating.value = true
+  try {
+    const res = await apiFetch(`/parameters/${param.key}/suggestions`, {
+      method: 'POST',
+      body: JSON.stringify({countries})
+    })
+    if(res.status === 502){suggestError.value = 'Suggestion generation failed. Try again'; return}
+    if(!res.ok) throw new Error(`Request failed: ${res.status}`)
+    suggestCountries.value = ''
+    await loadParameters()
+    overridesFor.value = parameters.value.find(p => p.key === param.key) ?? null
+  } catch (err) {
+    console.error('Failed to generate suggestions:', err)
+    suggestError.value = 'Could not generate suggestions.'
+  } finally {
+    generating.value = false
+  }
+}
+
+async function approveSuggestion(param, country, value){
+  suggestError.value = ''
+  conflict.value = null
+  missing.value = false
+  try {
+    const body = value === undefined
+      ? {expectedVersion: param.version}
+      : {value, expectedVersion: param.version}
+    const res = await apiFetch(`/parameters/${param.key}/suggestions/${country}/approve`, {
+      method: 'POST',
+      body: JSON.stringify(body)
+    })
+    if(res.status === 409){
+      const b = await res.json()
+      param.value = b.current.value
+      param.version = b.current.version
+      param.updatedBy = b.current.updatedBy
+      param.updatedAt = b.current.updatedAt
+      conflict.value = {param, current: b.current, retry: () => approveSuggestion(param, country, value), attempted: value ?? '(suggested)'}
+      return
+    }
+    if(res.status === 404) {
+      await loadParameters()
+      const fresh = parameters.value.find(p => p.key === param.key) ?? null
+      if(fresh){
+        overridesFor.value = fresh
+        editingSuggestion.value = null
+      } else {
+        missing.value = true
+      }
+      return
+    }
+
+    if(!res.ok) throw new Error(`Request failed: ${res.status}`)
+    editingSuggestion.value = null
+    await loadParameters()
+    overridesFor.value = parameters.value.find(p => p.key === param.key) ?? null
+  } catch (err) {
+    console.error('Failed to approve suggestion:', err)
+    suggestError.value = 'Could not approve suggestion.'    
+  }
+}
+
+async function rejectSuggestion(param, country){
+  suggestError.value = ''
+  try {
+    const res = await apiFetch(`/parameters/${param.key}/suggestions/${country}`, {method: 'DELETE'})
+    if(!res.ok) throw new Error(`Request failed: ${res.status}`)
+    await loadParameters()
+    overridesFor.value = parameters.value.find(p => p.key === param.key) ?? null
+  } catch (err) {
+    console.error('Failed to reject suggestion:', err)
+    suggestError.value = 'Could not reject suggestion.'
+  }
 }
 
 onMounted(loadParameters)
@@ -386,6 +484,39 @@ onMounted(loadParameters)
       <button @click="submitOverride" class="btn btn-add">Save override</button>
 
       <p v-if="overrideError">{{ overrideError }}</p>
+
+      <h4>AI suggestions</h4>
+      <div v-if="overridesFor.suggestions && Object.keys(overridesFor.suggestions).length">
+        <template v-for="(entry, country) in overridesFor.suggestions" :key="country">
+          <div v-if="entry.status === 'pending'" class="override-row">
+            <template v-if="editingSuggestion === country">
+              <span>{{country}} (default: {{ overridesFor.value }})</span>
+              <TypedValueInput
+                :key="suggestionKey"
+                :type="overridesFor.type"
+                v-model="suggestionValue"
+                @update:valid="suggestionValueValid = $event"
+              />
+              <button @click="approveSuggestion(overridesFor, country, suggestionValue)" class="btn btn-add" :disabled="!suggestionValueValid">Approve edit</button>
+              <button @click="cancelEditSuggestion" class="btn btn-override">Cancel</button>
+            </template>
+            <template v-else>
+              <span>{{ country }}: {{ entry.value }} (default: {{ overridesFor.value }})</span>
+              <button @click="approveSuggestion(overridesFor, country)" class="btn btn-add">Approve</button>
+              <button @click="startEditSuggestion(country, entry)" class="btn btn-edit">Edit</button>
+              <button @click="rejectSuggestion(overridesFor, country)" class="btn btn-delete">Reject</button>
+            </template>
+          </div>
+        </template>
+      </div>
+      <p v-else>No suggestions yet.</p>
+
+      <input type="text" v-model="suggestCountries" placeholder="Countries (e.g: DE, FR)" class="field">
+      <button @click="generateSuggestions(overridesFor)" class="btn btn-add" :disabled="generating">
+        {{ generating ? 'Generating...' : 'Generate Suggestions' }}
+      </button>
+      <p v-if="suggestError">{{ suggestError }}</p>
+
       <button @click="closeOverrides" class="btn btn-override">Close</button>
     </div>
   </div>
