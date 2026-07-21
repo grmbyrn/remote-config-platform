@@ -142,6 +142,18 @@ export async function saveSuggestions({key, suggestions}){
     return {key, suggestions}
 }
 
+export async function rejectSuggestion({key, country}) {
+    const ref = db.collection('parameters').doc(key)
+    const snapshot = await ref.get()
+    if(!snapshot.exists){
+        const err = new Error(`Parameter '${key}' not found.`)
+        err.code = 'NOT_FOUND'
+        throw err
+    }
+    await ref.update({[`suggestions.${country}`]: FieldValue.delete()})
+    return {key, country}
+}
+
 export async function getParameter({key}){
     const snapshot = await db.collection('parameters').doc(key).get()
     if(!snapshot.exists){
@@ -150,4 +162,27 @@ export async function getParameter({key}){
         throw err
     }
     return {key, ...snapshot.data()}
+}
+
+export async function approveSuggestion({key, country, value, expectedVersion, updatedBy}){
+    return updateWithVersionCheck({
+        key, expectedVersion, updatedBy,
+        apply: ({current, updatedAt}) => {
+            const pending = current.suggestions?.[country]
+            if(!pending || pending.status !== 'pending'){
+                const err = new Error(`No pending suggestion for '${country}'`)
+                err.code = 'NO_SUGGESTION'
+                throw err
+            }
+            const finalValue = value !== undefined ? value : pending.value
+            assertValidValue(current.type, finalValue)
+            return {
+                fields: {
+                    [`countryOverrides.${country}`]: {value: finalValue, updatedAt, updatedBy},
+                    [`suggestions.${country}`]: FieldValue.delete()
+                },
+                result: {country, value: finalValue}
+            }
+        }
+    })
 }

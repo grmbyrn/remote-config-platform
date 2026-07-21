@@ -1,5 +1,5 @@
 import { normalizeCountry } from "../lib/country.js";
-import { listParameters, createParameter, updateParameter, deleteParameter, setCountryOverride, removeCountryOverride, saveSuggestions, getParameter } from "../services/parameters.js";
+import { listParameters, createParameter, updateParameter, deleteParameter, setCountryOverride, removeCountryOverride, saveSuggestions, getParameter, approveSuggestion, rejectSuggestion } from "../services/parameters.js";
 import { generateSuggestions } from "../services/suggestions.js";
 
 export async function getParametersHandler(req, res){
@@ -195,5 +195,52 @@ export async function postSuggestionsHandler(req, res){
         }
         console.error('Failed to generate suggestions:', err)
         res.status(500).json({error: 'Failed to generate suggestions'})
+    }
+}
+
+export async function approveSuggestionHandler(req, res){
+    const {key, country: rawCountry} = req.params
+    const {value, expectedVersion} = req.body
+
+    const country = normalizeCountry(rawCountry)
+    if(!country){
+        return res.status(400).json({error: 'country must be a two-letter code'})
+    }
+    const version = Number(expectedVersion)
+    if(!Number.isInteger(version)){
+        return res.status(400).json({error: 'expectedVersion must be an integer'})
+    }
+
+
+    try {
+        const updated = await approveSuggestion({
+            key, country, value, expectedVersion: version, updatedBy: req.user.email
+        })
+        res.json(updated)
+    } catch (err) {
+        if(err.code === 'NOT_FOUND') return res.status(404).json({error: err.message})
+        if(err.code === 'NO_SUGGESTION') return res.status(404).json({error: err.message})
+        if(err.code === 'VERSION_CONFLICT') return res.status(409).json({error: 'Version conflict', current: err.current})
+        if(err.code === 'INVALID_VALUE') return res.status(400).json({error: err.message})
+        console.error('Failed to approve suggestion:', err)
+        res.status(500).json({error: 'Failed to approve suggestion'})
+    }
+}
+
+export async function rejectSuggestionHandler(req, res) {
+    const {key, country: rawCountry} = req.params
+
+    const country = normalizeCountry(rawCountry)
+    if(!country){
+        return res.status(400).json({error: 'country must be a two-letter code'})
+    }
+
+    try {
+        const result = await rejectSuggestion({key, country})
+        res.json(result)
+    } catch (err) {
+        if(err.code === 'NOT_FOUND') return res.status(404).json({error: err.message})
+        console.error('Failed to reject suggestion:', err)
+        res.status(500).json({error: 'Failed to reject suggestion'})
     }
 }

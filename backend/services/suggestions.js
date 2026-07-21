@@ -53,7 +53,7 @@ export async function generateSuggestions({type, defaultValue, description, coun
 
     let parsed
     try {
-        parsed = JSON.parse(text)
+        parsed = JSON.parse(json)
     } catch {
         const err = new Error("Model did not return valid JSON")
         err.code = "AI_BAD_OUTPUT"
