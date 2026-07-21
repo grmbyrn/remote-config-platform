@@ -3,6 +3,7 @@ import {ref} from 'vue'
 import {useRouter} from 'vue-router'
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import {auth} from '../firebase'
+import logoUrl from '../assets/codeway.png'
 
 const email = ref('')
 const password = ref('')
@@ -24,6 +25,7 @@ async function handleSignIn() {
 
 <template>
   <div class="signin">
+    <img :src="logoUrl" alt="Codeway" class="logo">
     <h1>Please sign in</h1>
     <form @submit.prevent="handleSignIn">
       <div class="fields">
@@ -47,7 +49,7 @@ async function handleSignIn() {
   justify-content: center;
 }
 
-.logo { width: 268px; margin-bottom: 70px; }
+.logo { width: 268px; margin-bottom: 24px; }
 
 h1 {
   font-size: var(--text-xl);

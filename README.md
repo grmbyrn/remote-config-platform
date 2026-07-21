@@ -73,7 +73,7 @@ Firestore collection `parameters`, one document per parameter, keyed by the para
   "suggestions": {
     "DE": {
       "value": "2.1",
-      "model": "gpt-4o-mini",
+      "model": "claude-haiku-4-5-20251001",
       "generatedAt": "...",
       "status": "pending"
     }
@@ -109,18 +109,18 @@ The mobile-facing `GET /config` endpoint reads from an in-memory config compiled
 
 ## Implementation status
 
-| Area                                                 | Status                                       |
-| ---------------------------------------------------- | -------------------------------------------- |
-| Firebase Auth (panel login)                          | ✅ Working end-to-end                        |
-| Firestore connectivity (Admin SDK)                   | ✅ Confirmed read/write                      |
-| Vue routing (`/`, `/signin`)                         | ✅ Working, protected by auth guard          |
-| Parameters CRUD (backend + panel)                    | 🔲 Backend complete; panel has no delete UI  |
-| Concurrency control (implemented, not just designed) | ✅ Version-checked `PUT`, recoverable 409 UX |
-| Country audience UI + logic                          | ✅ Override modal + audience resolution      |
-| AI-assisted suggestion flow                          | ✅ Generate + review (approve/edit/reject)   |
-| Mobile-facing serving endpoint                       | ✅ Token-protected `GET /config`, live cache |
-| Responsive/mobile panel layout                       | 🔲 Planned                                   |
-| Deployment (live URLs)                               | ✅ Cloud Run + Firebase Hosting              |
+| Area                                                 | Status                                         |
+| ---------------------------------------------------- | ---------------------------------------------- |
+| Firebase Auth (panel login)                          | ✅ Working end-to-end                          |
+| Firestore connectivity (Admin SDK)                   | ✅ Confirmed read/write                        |
+| Vue routing (`/`, `/signin`)                         | ✅ Working, protected by auth guard            |
+| Parameters CRUD (backend + panel)                    | ✅ Full CRUD in panel, incl. delete + confirm  |
+| Concurrency control (implemented, not just designed) | ✅ Version-checked `PUT`, recoverable 409 UX   |
+| Country audience UI + logic                          | ✅ Override modal + audience resolution        |
+| AI-assisted suggestion flow                          | ✅ Generate + review (approve/edit/reject)     |
+| Mobile-facing serving endpoint                       | ✅ Token-protected `GET /config`, live cache   |
+| Responsive/mobile panel layout                       | ✅ Table-to-cards < 768px, modals fit viewport |
+| Deployment (live URLs)                               | ✅ Cloud Run + Firebase Hosting                |
 
 ---
 
@@ -134,6 +134,10 @@ Adding `expectedVersion` to `DELETE` is a natural extension.
 **Parameter `type` is immutable.** `PUT` accepts `value` only. Country overrides and AI suggestions are both validated against a parameter's `type`, so changing it would strand existing data that no longer matches its own schema. Delete and recreate is the honest migration path.
 
 **`description` cannot be edited after creation.** This one is a gap rather than a design choice, a typo in a description is currently permanent. It would flow through the same version-checked transaction as a value edit if added.
+
+**The API token comparison isn't timing-safe.** `requireApiToken` checks the mobile client's token with a plain `!==` string compare, which can short-circuit on the first differing character and leak a small timing signal about how much of the token matched. The token is a single static, high-entropy secret sent over TLS, so the practical exposure is negligible, but `crypto.timingSafeEqual` would remove even that signal. Recorded here rather than left unmentioned.
+
+**A dead config listener serves stale config silently.** `GET /config` reads from an in-memory snapshot kept live by a Firestore `onSnapshot` listener. The listener's error handler rejects only during startup; if it fails after the initial load, the endpoint keeps serving the last-known config with nothing to surface the staleness — no error to the caller, no health signal. This is the cost of constant-time reads over a per-request query; re-subscribing on error (or flagging a degraded state) is the natural extension.
 
 ---
 
@@ -160,10 +164,13 @@ cd ../backend && npm install
 **`backend/.env`** (see `backend/.env.example`):
 
 ```
-PORT=3000
+PORT=
 FIREBASE_PROJECT_ID=
 FIREBASE_CLIENT_EMAIL=
 FIREBASE_PRIVATE_KEY=
+FRONTEND_ORIGIN=
+API_TOKEN=
+ANTHROPIC_API_KEY=
 ```
 
 **`frontend/.env`** (see `frontend/.env.example`):

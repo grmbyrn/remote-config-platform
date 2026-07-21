@@ -2,6 +2,7 @@
 import {ref, onMounted, computed} from 'vue'
 import { apiFetch } from '../api.js'
 import TypedValueInput from '../components/TypedValueInput.vue'
+import AppNavbar from '@/components/AppNavbar.vue'
 
 const parameters = ref([])
 const loading = ref(false)
@@ -32,6 +33,8 @@ const editingSuggestion = ref(null)
 const suggestionValue = ref('')
 const suggestionValueValid = ref(true)
 const suggestionKey = ref(0)
+const pendingDelete = ref(null)
+const deleteError = ref('')
 
 const dateFormat = new Intl.DateTimeFormat('en-GB', {
   day: '2-digit',
@@ -108,6 +111,27 @@ async function addParameters(){
   } catch (err) {
     console.error('Failed to create parameter:', err)
     createError.value = 'Could not create parameter.'
+  }
+}
+
+async function removeParameter(){
+  const param = pendingDelete.value
+  if(!param) return
+  deleteError.value = ''
+
+  try {
+    const res = await apiFetch(`/parameters/${param.key}`, {method: 'DELETE'})
+    if(res.status === 404){
+      pendingDelete.value = null
+      await loadParameters() // already deleted elsewhere - just resync
+      return
+    }
+    if(!res.ok) throw new Error(`Request failed: ${res.status}`)
+    pendingDelete.value = null
+    await loadParameters()
+  } catch (err) {
+    console.error('Failed to delete parameter:', err)
+    deleteError.value = 'Could not delete parameter'
   }
 }
 
@@ -369,6 +393,7 @@ onMounted(loadParameters)
 </script>
 
 <template>
+  <AppNavbar />
   <div class="page">
     <p v-if="loading"> Loading...</p>
     <p v-else-if="error">{{ error }}</p>
@@ -386,21 +411,29 @@ onMounted(loadParameters)
       </thead>
       <tbody>
         <tr v-for="param in sortedParameters" :key="param.key">
-          <td>{{ param.key }}</td>
-          <td>
+          <td data-label="Parameter Key">{{ param.key }}</td>
+          <td data-label="Value">
             <input type="text" v-if="editingKey === param.key" v-model="editValue" class="field" />
             <span v-else>{{ param.value }}</span>
           </td>
-          <td>{{ param.description }}</td>
-          <td>{{ formatDate(param.createdAt) }}</td>
+          <td data-label="Description">{{ param.description }}</td>
+          <td data-label="Create Date">{{ formatDate(param.createdAt) }}</td>
           <td>
             <template v-if="editingKey === param.key">
-              <button @click="saveEdit(param)" class="btn btn-edit">Save</button>
+              <button @click="saveEdit(param)" class="btn btn-add">Save</button>
               <button @click="cancelEdit" class="btn btn-override">Cancel</button>
             </template>
             <template v-else>
-              <button @click="startEdit(param)" class="btn btn-edit">Edit</button>
-              <button @click="openOverrides(param)" class="btn btn-override">Override</button>
+              <button @click="startEdit(param)" class="btn btn-edit">
+                Edit
+              </button>
+              <button @click="openOverrides(param)" class="btn btn-override">
+                Override
+              </button>
+              <button @click="pendingDelete = param" class="btn btn-delete">
+                <span class="txt-full">Delete</span>
+                <span class="txt-short">Del</span>
+              </button>
             </template>
           </td>
         </tr>
@@ -436,6 +469,19 @@ onMounted(loadParameters)
     </table>
     <p v-if="createError">{{ createError }}</p>
     <p v-if="editError">{{ editError }}</p>
+
+    <div v-if="pendingDelete" class="backdrop backdrop-top">
+      <div class="dialog">
+        <h3>Delete "{{ pendingDelete.key }}"</h3>
+        <p>This removes the parameter and its overrides from the panel and from <code>/config</code>. This can't be undone.</p>
+        <p v-if="deleteError">{{ deleteError }}</p>
+        <button @click="removeParameter" class="btn btn-delete">
+          <span class="txt-full">Delete</span>
+          <span class="txt-short">Del</span>
+        </button>
+        <button @click="pendingDelete = null" class="btn btn-override">Cancel</button>
+      </div>
+    </div>
 
     <div v-if="conflict" class="backdrop backdrop-top">
       <div class="dialog">
@@ -536,6 +582,7 @@ onMounted(loadParameters)
   width: 100%;
   max-width: 1828px;
   border-collapse: collapse;
+  color: #fff;
 }
 
 th{
@@ -570,6 +617,8 @@ th{
   filter: none;
 }
 
+.txt-short { display: none; }
+
 .override-row {
   display: flex;
   align-items: center;
@@ -592,6 +641,9 @@ th{
 .backdrop-top { z-index: 20; }
 
 .dialog {
+  width: min(480px, calc(100vw - 2 * var(--space-4)));
+  max-height: calc(100vh - 2 * var(--space-5));
+  overflow-y: auto;
   background: #1e2235;
   color: #fff;
   padding: 24px;
@@ -607,9 +659,43 @@ th{
   gap: var(--space-2);
   align-items: center;
 }
-.field-type { width: auto; flex: 0 0 auto; }   /* select stays compact */
-.value-cell .typed-input { flex: 1; }           /* value input fills the rest */
+.field-type { width: auto; flex: 0 0 auto; }
+.value-cell .typed-input { flex: 1; }
 
-/* let the create row breathe like the design */
 td { padding: var(--space-2) var(--space-3) var(--space-2) 0; }
+
+@media (max-width: 768px) {
+  .page { padding: var(--space-4); justify-content: flex-start; }
+
+  thead { display: none; }
+  .table, tbody, tr, td { display: block; width: 100%; }
+
+  tbody tr {
+    border: 1px solid #fff;
+    border-radius: var(--radius-card);
+    padding: var(--space-3);
+    margin-bottom: var(--space-4);
+  }
+
+  td { padding: var(--space-1) 0; }
+
+  td[data-label]::before {
+    content: attr(data-label) ": ";
+    font-weight: 700;
+    color: var(--text-muted);
+  }
+
+  td:last-child {
+    display: flex;
+    justify-content: center;
+    gap: var(--space-2);
+    margin-top: var(--space-3);
+  }
+
+  .value-cell { flex-wrap: wrap; }
+  .btn { margin: var(--space-2) var(--space-2) 0 0; }
+
+  .txt-full  { display: none; }
+  .txt-short { display: inline; }
+}
 </style>
