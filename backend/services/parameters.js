@@ -122,3 +122,32 @@ export async function removeCountryOverride({key, country, expectedVersion, upda
         })
     })
 }
+
+export async function saveSuggestions({key, suggestions}){
+    const ref = db.collection('parameters').doc(key)
+    const snapshot = await ref.get()
+    if(!snapshot.exists){
+        const err = new Error(`Parameter '${key}' not found.`)
+        err.code = 'NOT_FOUND'
+        throw err
+    }
+
+    // Regenerating overwrites any existing pending suggestion for a country:
+    // it's unapproved, nothing durable hangs off it, and a re-run means "give me a fresh take".
+    const updates = {}
+    for(const [country, entry] of Object.entries(suggestions)){
+        updates[`suggestions.${country}`] = entry
+    }
+    await ref.update(updates)
+    return {key, suggestions}
+}
+
+export async function getParameter({key}){
+    const snapshot = await db.collection('parameters').doc(key).get()
+    if(!snapshot.exists){
+        const err = new Error(`Parameter '${key}' not found.`)
+        err.code = 'NOT_FOUND'
+        throw err
+    }
+    return {key, ...snapshot.data()}
+}

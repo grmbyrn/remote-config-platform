@@ -1,5 +1,6 @@
 import { normalizeCountry } from "../lib/country.js";
-import { listParameters, createParameter, updateParameter, deleteParameter, setCountryOverride, removeCountryOverride } from "../services/parameters.js";
+import { listParameters, createParameter, updateParameter, deleteParameter, setCountryOverride, removeCountryOverride, saveSuggestions, getParameter } from "../services/parameters.js";
+import { generateSuggestions } from "../services/suggestions.js";
 
 export async function getParametersHandler(req, res){
     try {
@@ -159,5 +160,40 @@ export async function deleteOverrideHandler(req, res) {
         }
         console.error('Failed to remove country override:', err)
         res.status(500).json({error: 'Failed to remove country override'})
+    }
+}
+
+export async function postSuggestionsHandler(req, res){
+    const {key} = req.params
+    const {countries} = req.body
+
+    if(!Array.isArray(countries) || countries.length === 0){
+        return res.status(400).json({error: 'countries must be a non-empty array'})
+    }
+
+    try {
+        const param = await getParameter({key})
+
+        const suggestions = await generateSuggestions({
+            type: param.type,
+            defaultValue: param.value,
+            description: param.description,
+            countries
+        })
+
+        const saved = await saveSuggestions({key, suggestions})
+        res.json(saved)
+    } catch (err){
+        if(err.code === 'NOT_FOUND'){
+            return res.status(404).json({error: err.message})
+        }
+        if(err.code === 'NO_API_KEY'){
+            return res.status(500).json({error: 'AI suggestions are not configured'})
+        }
+        if(err.code === 'AI_REQUEST_FAILED' || err.code === 'AI_BAD_OUTPUT'){
+            return res.status(502).json({error: 'Suggestion generation failed'})
+        }
+        console.error('Failed to generate suggestions:', err)
+        res.status(500).json({error: 'Failed to generate suggestions'})
     }
 }

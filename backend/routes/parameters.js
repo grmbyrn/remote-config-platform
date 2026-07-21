@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { requireFirebaseAuth } from "../middleware/requireFirebaseAuth.js";
-import { getParametersHandler, postParameterHandler, putParameterHandler, deleteParameterHandler, putOverrideHandler, deleteOverrideHandler } from "../controllers/parametersController.js";
+import { getParametersHandler, postParameterHandler, putParameterHandler, deleteParameterHandler, putOverrideHandler, deleteOverrideHandler, postSuggestionsHandler } from "../controllers/parametersController.js";
 
 const router = Router()
 
@@ -10,5 +10,6 @@ router.put('/:key', requireFirebaseAuth, putParameterHandler)
 router.delete('/:key', requireFirebaseAuth, deleteParameterHandler)
 router.put('/:key/overrides/:country', requireFirebaseAuth, putOverrideHandler)
 router.delete('/:key/overrides/:country', requireFirebaseAuth, deleteOverrideHandler)
+router.post('/:key/suggestions', requireFirebaseAuth, postSuggestionsHandler)
 
 export default router
