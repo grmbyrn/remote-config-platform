@@ -3,6 +3,24 @@
    Screenshots are 1x captures, so px values map 1:1 to CSS px.
    ============================================================ */
 
+/* hide native number spinners */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+input[type="checkbox"] {
+  accent-color: var(--btn-edit);
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+}
+
 :root {
   /* --- surfaces --- */
   --bg: #1e1e2c;
@@ -49,7 +67,7 @@
   --text-sm: 13px;
   --text-base: 15px;
   --text-lg: 17px;
-  --text-xl: 28px;
+  --text-xl: 24px;
 
   /* --- motion --- */
   --transition: 0.15s ease;

@@ -10,6 +10,7 @@ const app = initializeApp({
 })
 
 export const db = getFirestore(app)
+db.settings({ignoreUndefinedProperties: true})
 
 export async function pingFirestore(){
     const ref = db.collection('_healthcheck').doc('ping')

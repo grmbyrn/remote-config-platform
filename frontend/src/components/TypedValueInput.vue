@@ -35,6 +35,7 @@ function emitValue(){
             break
         default:
             value = raw.value
+            valid = raw.value.trim() !== ''
     }
     emit('update:modelValue', value)
     emit('update:valid', valid)

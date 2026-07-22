@@ -59,6 +59,8 @@ function formatDate(iso) {
   return Number.isNaN(d.getTime()) ? '' : dateFormat.format(d).replace(',', '')
 }
 
+const vFocus = {mounted: (el) => {el.focus(); el.select()}}
+
 async function loadParameters(){
   loading.value = true
   error.value = ''
@@ -413,7 +415,7 @@ onMounted(loadParameters)
         <tr v-for="param in sortedParameters" :key="param.key">
           <td data-label="Parameter Key">{{ param.key }}</td>
           <td data-label="Value">
-            <input type="text" v-if="editingKey === param.key" v-model="editValue" class="field" />
+            <input type="text" v-if="editingKey === param.key" v-model="editValue" class="field field-inline" v-focus />
             <span v-else>{{ param.value }}</span>
           </td>
           <td data-label="Description">{{ param.description }}</td>
@@ -467,12 +469,12 @@ onMounted(loadParameters)
         </tr>
       </tbody>
     </table>
-    <p v-if="createError">{{ createError }}</p>
-    <p v-if="editError">{{ editError }}</p>
+    <p v-if="createError" class="form-error">{{ createError }}</p>
+    <p v-if="editError" class="form-error">{{ editError }}</p>
 
     <div v-if="pendingDelete" class="backdrop backdrop-top">
       <div class="dialog">
-        <h3>Delete "{{ pendingDelete.key }}"</h3>
+        <h3 class="form-error">Delete "{{ pendingDelete.key }}"</h3>
         <p>This removes the parameter and its overrides from the panel and from <code>/config</code>. This can't be undone.</p>
         <p v-if="deleteError">{{ deleteError }}</p>
         <button @click="removeParameter" class="btn btn-delete">
@@ -529,7 +531,7 @@ onMounted(loadParameters)
       />
       <button @click="submitOverride" class="btn btn-add">Save override</button>
 
-      <p v-if="overrideError">{{ overrideError }}</p>
+      <p v-if="overrideError" class="form-error">{{ overrideError }}</p>
 
       <h4>AI suggestions</h4>
       <div v-if="overridesFor.suggestions && Object.keys(overridesFor.suggestions).length">
@@ -561,7 +563,7 @@ onMounted(loadParameters)
       <button @click="generateSuggestions(overridesFor)" class="btn btn-add" :disabled="generating">
         {{ generating ? 'Generating...' : 'Generate Suggestions' }}
       </button>
-      <p v-if="suggestError">{{ suggestError }}</p>
+      <p v-if="suggestError" class="form-error">{{ suggestError }}</p>
 
       <button @click="closeOverrides" class="btn btn-override">Close</button>
     </div>
@@ -570,10 +572,8 @@ onMounted(loadParameters)
 
 <style scoped>
 .page {
-  min-height: 100vh;
   display: flex;
   flex-direction: column;
-  justify-content: center;
   align-items: center;
   padding: var(--space-7) var(--gutter);
 }
@@ -587,6 +587,11 @@ onMounted(loadParameters)
 
 th{
   text-align: left;
+  font-size: var(--text-xl);
+  font-weight: 400;
+  color: var(--text-muted);
+  padding-bottom: var(--space-5);
+  white-space: nowrap;
 }
 
 .btn {
@@ -629,6 +634,8 @@ th{
 
 .dialog .field { margin-bottom: var(--space-3); }
 
+.field-inline { height: var(--btn-height); }
+
 .backdrop {
   position: fixed;
   inset: 0;
@@ -664,7 +671,21 @@ th{
 
 td { padding: var(--space-2) var(--space-3) var(--space-2) 0; }
 
-@media (max-width: 768px) {
+.form-error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: rgba(248, 80, 119, 0.12);
+  border: 1px solid rgba(248, 80, 119, 0.4);
+  border-radius: var(--radius-input);
+  color: #ff8095;
+  font-size: var(--text-sm);
+}
+.form-error::before { content: "⚠"; }
+
+@media (max-width: 1024px) {
   .page { padding: var(--space-4); justify-content: flex-start; }
 
   thead { display: none; }
@@ -697,5 +718,15 @@ td { padding: var(--space-2) var(--space-3) var(--space-2) 0; }
 
   .txt-full  { display: none; }
   .txt-short { display: inline; }
+}
+
+@media (min-width: 1025px) {
+  td:last-child {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-wrap: nowrap;
+  }
+  td:last-child .btn { min-width: 96px; }
 }
 </style>

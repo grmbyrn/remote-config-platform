@@ -135,8 +135,6 @@ Adding `expectedVersion` to `DELETE` is a natural extension.
 
 **`description` cannot be edited after creation.** This one is a gap rather than a design choice, a typo in a description is currently permanent. It would flow through the same version-checked transaction as a value edit if added.
 
-**The API token comparison isn't timing-safe.** `requireApiToken` checks the mobile client's token with a plain `!==` string compare, which can short-circuit on the first differing character and leak a small timing signal about how much of the token matched. The token is a single static, high-entropy secret sent over TLS, so the practical exposure is negligible, but `crypto.timingSafeEqual` would remove even that signal. Recorded here rather than left unmentioned.
-
 **A dead config listener serves stale config silently.** `GET /config` reads from an in-memory snapshot kept live by a Firestore `onSnapshot` listener. The listener's error handler rejects only during startup; if it fails after the initial load, the endpoint keeps serving the last-known config with nothing to surface the staleness — no error to the caller, no health signal. This is the cost of constant-time reads over a per-request query; re-subscribing on error (or flagging a degraded state) is the natural extension.
 
 ---

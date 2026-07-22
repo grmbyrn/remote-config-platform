@@ -5,10 +5,12 @@ import { signInWithEmailAndPassword } from 'firebase/auth';
 import {auth} from '../firebase'
 import logoUrl from '../assets/codeway.png'
 
+const router = useRouter()
+
 const email = ref('')
 const password = ref('')
 const error = ref('')
-const router = useRouter()
+const year = new Date().getFullYear()
 
 async function handleSignIn() {
   error.value = ''
@@ -33,10 +35,11 @@ async function handleSignIn() {
         <input type="password" v-model="password" placeholder="Password" autocomplete="current-password">
       </div>
       <button type="submit" class="btn-signin">
-        Sign In
+        Sign in
       </button>
     </form>
-    <p v-if="error">{{ error }}</p>
+    <p v-if="error" class="form-error">{{ error }}</p>
+    <p class="footer">Codeway © {{ year }}</p>
   </div>
 </template>
 
@@ -71,11 +74,13 @@ h1 {
 }
 
 .fields input:first-child { border-radius: var(--radius-input) var(--radius-input) 0 0; }
-.fields input:last-child  { border-radius: 0 0 var(--radius-input) var(--radius-input); border-top: none; }
+.fields input:last-child  { border-radius: 0 0 var(--radius-input) var(--radius-input); margin-top: -1px; }
 
 .fields input:focus {
   outline: none;
   border-color: var(--input-border-focus);
+  position: relative;
+  z-index: 1;
 }
 
 .btn-signin {
@@ -87,6 +92,20 @@ h1 {
   color: #fff;
   font-weight: 700;
 }
+
+.form-error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: rgba(248, 80, 119, 0.12);
+  border: 1px solid rgba(248, 80, 119, 0.4);
+  border-radius: var(--radius-input);
+  color: #ff8095;
+  font-size: var(--text-sm);
+}
+.form-error::before { content: "⚠"; }
 
 .footer {
   margin-top: 83px;
