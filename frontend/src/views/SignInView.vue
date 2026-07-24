@@ -39,7 +39,7 @@ async function handleSignIn() {
       </button>
     </form>
     <p v-if="error" class="form-error">{{ error }}</p>
-    <p class="footer">Codeway © {{ year }}</p>
+    <p class="footer">Graeme Byrne © {{ year }}</p>
   </div>
 </template>
 
