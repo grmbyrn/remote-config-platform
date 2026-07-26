@@ -1,5 +1,5 @@
 <script setup>
-import {ref, onMounted, computed} from 'vue'
+import {ref, onMounted, computed, watch} from 'vue'
 import { apiFetch } from '../api.js'
 import TypedValueInput from '../components/TypedValueInput.vue'
 import AppNavbar from '@/components/AppNavbar.vue'
@@ -13,6 +13,7 @@ const newDescription = ref('')
 const createError = ref('')
 const editingKey = ref(null)
 const editValue = ref('')
+const editDescription = ref('')
 const editError = ref('')
 const conflict = ref(null)
 const missing = ref(false)
@@ -43,6 +44,10 @@ const dateFormat = new Intl.DateTimeFormat('en-GB', {
   hour: '2-digit',
   minute: '2-digit',
   hourCycle: 'h23',
+})
+
+watch([newKey, newValue, newType, newValueValid], () => {
+  createError.value = ''
 })
 
 const sortedParameters = computed(() => 
@@ -84,8 +89,17 @@ async function loadParameters(){
 async function addParameters(){
   createError.value = ''
 
-  if(!newKey.value || !newValueValid.value){
-    createError.value = 'Key and value are required.'
+  if(!newKey.value.trim()){
+    createError.value = 'Key is required.'
+    return
+  }
+  
+  if(!newValueValid.value){
+    createError.value = {
+      string: 'Value is required.',
+      number: 'Value must be a number.',
+      json: 'Value must be valid, non-empty JSON.'
+    }[newType.value] ?? 'Value is invalid.'
     return
   }
 
@@ -97,6 +111,12 @@ async function addParameters(){
 
     if(res.status === 409){
       createError.value = `A parameter named "${newKey.value}" already exists.`
+      return
+    }
+
+    if(res.status === 400){
+      const body = await res.json()
+      createError.value = body.error
       return
     }
 
@@ -140,6 +160,7 @@ async function removeParameter(){
 function startEdit(param){
   editingKey.value = param.key
   editValue.value = param.value
+  editDescription.value = param.description ?? ''
   editError.value = ''
   conflict.value = null
   missing.value = false
@@ -160,13 +181,14 @@ async function saveEdit(param){
   try {
     const res = await apiFetch(`/parameters/${param.key}`, {
       method: 'PUT',
-      body: JSON.stringify({value: editValue.value, expectedVersion: param.version})
+      body: JSON.stringify({value: editValue.value, description: editDescription.value, expectedVersion: param.version})
     })
 
     if(res.status === 409){
       const body = await res.json()
 
       param.value = body.current.value
+      param.description = body.current.description
       param.version = body.current.version
       param.updatedBy = body.current.updatedBy
       param.updatedAt = body.current.updatedAt
@@ -177,6 +199,12 @@ async function saveEdit(param){
 
     if(res.status === 404){
       missing.value = true
+      return
+    }
+
+    if(res.status === 400){
+      const body = await res.json()
+      editError.value = body.error
       return
     }
 
@@ -418,7 +446,10 @@ onMounted(loadParameters)
             <input type="text" v-if="editingKey === param.key" v-model="editValue" class="field field-inline" v-focus />
             <span v-else>{{ param.value }}</span>
           </td>
-          <td data-label="Description">{{ param.description }}</td>
+          <td data-label="Description">
+            <input type="text" v-if="editingKey === param.key" v-model="editDescription" class="field field-inline">
+            <span v-else>{{ param.description }}</span>
+          </td>
           <td data-label="Create Date">{{ formatDate(param.createdAt) }}</td>
           <td>
             <template v-if="editingKey === param.key">

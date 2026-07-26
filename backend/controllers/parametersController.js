@@ -1,6 +1,7 @@
 import { normalizeCountry } from "../lib/country.js";
 import { listParameters, createParameter, updateParameter, deleteParameter, setCountryOverride, removeCountryOverride, saveSuggestions, getParameter, approveSuggestion, rejectSuggestion } from "../services/parameters.js";
 import { generateSuggestions } from "../services/suggestions.js";
+import { isValidKey, isValidType, isValidDescription, VALID_TYPES } from "../lib/validate.js";
 
 export async function getParametersHandler(req, res){
     try {
@@ -18,8 +19,16 @@ export async function getParametersHandler(req, res){
 export async function postParameterHandler(req, res) {
     const {key, value, type, description} = req.body
 
-    if(!key || !type){
-        return res.status(400).json({error: "key and type are required"})
+    if(!isValidKey(key)){
+        return rejectSuggestion.status(400).json({error: 'key must be 1-100 characters, start with a letter, and an contain only letters, number, dot, underscore or hyphen'})
+    }
+
+    if(!isValidType(type)){
+        return res.status(400).json({error: `type must be one of: ${VALID_TYPES.join(', ')}`})
+    }
+
+    if(description !== undefined && !isValidDescription(description)){
+        return res.status(400).json({error: 'description must be a string of at most 500 characters'})
     }
 
     try {
@@ -39,10 +48,14 @@ export async function postParameterHandler(req, res) {
 
 export async function putParameterHandler(req, res) {
     const {key} = req.params
-    const {value, expectedVersion} = req.body
+    const {value, description, expectedVersion} = req.body
 
     if(value === undefined || expectedVersion === undefined){
         return res.status(400).json({error: 'value and expectedVersion are required'})
+    }
+
+    if(description !== undefined && !isValidDescription(description)){
+        return res.status(400).json({error: 'description must be a string of at most 500 characters'})
     }
 
     const version = Number(expectedVersion)
@@ -54,6 +67,7 @@ export async function putParameterHandler(req, res) {
         const updated = await updateParameter({
             key,
             value,
+            description,
             expectedVersion: version,
             updatedBy: req.user.email
         })

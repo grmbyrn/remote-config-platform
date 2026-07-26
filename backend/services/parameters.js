@@ -21,6 +21,7 @@ async function updateWithVersionCheck({key, expectedVersion, updatedBy, apply}){
             err.code = 'VERSION_CONFLICT'
             err.current = {
                 value: current.value,
+                description: current.description,
                 version: current.version,
                 updatedBy: current.updatedBy,
                 updatedAt: current.updatedAt
@@ -69,14 +70,16 @@ export async function createParameter({key, value, type, description}) {
     return {key, value, type, description, version: 1}
 }
 
-export async function updateParameter({key, value, expectedVersion, updatedBy}){
+export async function updateParameter({key, value, description, expectedVersion, updatedBy}){
     return updateWithVersionCheck({
         key, expectedVersion, updatedBy,
         apply: ({current}) => {
             assertValidValue(current.type, value)
+            const fields = {value}
+            if(description !== undefined) fields.description = description
             return {
-                fields: {value},
-                result: {...current, value}
+                fields,
+                result: {...current, ...fields}
             }
         }
     })

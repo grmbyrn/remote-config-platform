@@ -137,7 +137,6 @@ curl -H "Authorization: Bearer $API_TOKEN" "<your-api-url>/config?country=TR"
 Recorded so they read as decisions rather than oversights:
 
 - **Deletes are not version-checked.** `PUT` uses optimistic locking; `DELETE` does not. The interleaving that matters — deleting a parameter while another manager edits it — is already safe: the update transaction checks existence before the version, so the in-flight edit gets a `404` rather than resurrecting the document.
-- **Parameter `type` is immutable.** `PUT` accepts `value` only. Country overrides and AI suggestions are validated against a parameter's `type`, so changing it would strand data that no longer matches its own schema.
 - **A dead config listener serves stale config silently.** `GET /config` serves from an in-memory snapshot kept live by a Firestore `onSnapshot` listener. If the listener fails after startup, the endpoint keeps serving the last-known config with no health signal — the cost of constant-time reads over a per-request query. Re-subscribing on error is the natural extension.
 
 ---
