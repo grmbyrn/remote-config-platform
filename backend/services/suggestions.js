@@ -62,8 +62,9 @@ export async function generateSuggestions({type, defaultValue, description, coun
 
     const valid = {}
     for(const [country, value] of Object.entries(parsed)){
-        if(isValidValue(type, value)){
-            valid[normalizeCountry(country)] = {
+        const code = normalizeCountry(country)
+        if(code && isValidValue(type, value)){
+            valid[code] = {
                 value,
                 model: data.model,
                 generatedAt: new Date().toISOString(),
