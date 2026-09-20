@@ -20,7 +20,7 @@ export async function postParameterHandler(req, res) {
     const {key, value, type, description} = req.body
 
     if(!isValidKey(key)){
-        return rejectSuggestion.status(400).json({error: 'key must be 1-100 characters, start with a letter, and an contain only letters, number, dot, underscore or hyphen'})
+        return res.status(400).json({error: 'key must be 1-100 characters, start with a letter, and can contain only letters, numbers, dot, underscore or hyphen'})
     }
 
     if(!isValidType(type)){

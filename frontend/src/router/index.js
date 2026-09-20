@@ -20,7 +20,7 @@ const router = createRouter({
   ],
 })
 
-router.beforeEach(async (to) => {
+export async function authGuard(to){
   const user = await getCurrentUser()
 
   if(to.meta.requiresAuth && !user){
@@ -30,6 +30,8 @@ router.beforeEach(async (to) => {
   if(to.name === 'signin' && user){
     return {name: 'parameters'}
   }
-})
+}
+
+router.beforeEach(authGuard)
 
 export default router

@@ -8,5 +8,7 @@ CLAUDE.md
 roadmap.md
 todo-list.md
 improvement-roadmap.md
+testing-checklist.md
 .firebase/
 context
+coverage/

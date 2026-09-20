@@ -26,6 +26,7 @@ A full-stack remote configuration platform: a Vue 3 admin panel for managing app
 - **Backend:** Node.js, Express, Firebase Admin SDK
 - **Database:** Firestore
 - **Auth:** Firebase Authentication (email/password)
+- **Testing:** Vitest, supertest, Vue Test Utils, Firestore emulator
 - **Deployment:** Cloud Run (backend), Firebase Hosting (frontend)
 
 ---
@@ -40,7 +41,8 @@ remote-config-platform/
 │   ├── controllers/   request/response handling
 │   ├── services/      Firestore access logic
 │   ├── middleware/    auth middleware
-│   └── lib/           shared helpers (validation, country resolution)
+│   ├── lib/           shared helpers (validation, country resolution)
+│   └── tests/         unit + emulator-backed integration tests
 └── README.md
 ```
 
@@ -148,6 +150,7 @@ Recorded so they read as decisions rather than oversights:
 - Node.js (v20+)
 - A Firebase project with Authentication (Email/Password) and Firestore enabled
 - A Firebase service account key (for the backend)
+- Java 11+ — only to run the backend test suite; the Firestore emulator is a JVM application
 
 ### Clone and install
 
@@ -195,6 +198,37 @@ npm run dev   # http://localhost:3000
 cd frontend
 npm run dev   # http://localhost:5173
 ```
+
+---
+
+## Tests
+
+221 tests — 174 backend (Vitest + supertest, against the Firestore emulator) and 47 frontend (Vitest + jsdom + Vue Test Utils).
+
+| Suite | Command | Needs |
+| --- | --- | --- |
+| Backend, full | `cd backend && npm test` | Java (the emulator is a JVM app) |
+| Backend, units only | `cd backend && npm run test:unit` | nothing |
+| Frontend | `cd frontend && npm run test:run` | nothing |
+
+`npm test` boots a throwaway Firestore emulator via `firebase emulators:exec`, runs the suite against it, and tears it down. While writing tests, keep the emulator warm in its own terminal instead:
+
+```bash
+cd backend
+npm run emulators      # terminal 1
+npm run test:watch     # terminal 2
+```
+
+**No credentials required.** The suite runs against the emulator under the project id `demo-config-panel` — Firebase treats `demo-*` ids as guaranteed-local and refuses to contact Google, so a misconfigured run cannot reach the live database. `ANTHROPIC_API_KEY` is deleted in test setup and the Anthropic call is stubbed, so no test can make a billed request.
+
+Coverage (`npm run test:coverage`) sits at ~88% statements / ~90% branches on the backend, with `lib/`, `middleware/` and `services/suggestions.js` at 100%.
+
+CI runs both suites on every push and pull request — see `.github/workflows/test.yml`.
+
+### What isn't tested, and why
+
+- **`ParametersView.vue`** — 762 lines mixing fetching, conflict recovery, suggestion review and rendering. Tests against it as it stands would be slow and brittle; the honest fix is extracting the logic into a composable first, which is a refactor rather than a test task.
+- **The config listener's error branch** — the `onSnapshot` failure path in `services/config.js` is hard to trigger from outside, and is the same gap recorded in the tradeoffs above.
 
 ---
 

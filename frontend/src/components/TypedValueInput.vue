@@ -48,8 +48,8 @@ onMounted(() => {
 </script>
 
 <template>
-    <input type="text" v-if="type === 'string'" v-model="raw" @input="emitValue" class="field" placeholder="New Value">
-    <input type="number" v-if="type === 'number'" v-model="raw" @input="emitValue" class="field" placeholder="New Value">
-    <input type="checkbox" v-if="type === 'boolean'" v-model="raw" @change="emitValue" placeholder="New Value">
-    <textarea v-else-if="type === 'json'" v-model="raw" @input="emitValue" class="field" placeholder="New Value"></textarea>
+    <input key="string" type="text" v-if="type === 'string'" v-model="raw" @input="emitValue" class="field" placeholder="New Value">
+    <input key="number" type="number" v-else-if="type === 'number'" v-model="raw" @input="emitValue" class="field" placeholder="New Value">
+    <input key="boolean" type="checkbox" v-else-if="type === 'boolean'" v-model="raw" @change="emitValue">
+    <textarea key="json" v-else-if="type === 'json'" v-model="raw" @input="emitValue" class="field" placeholder="New Value"></textarea>
 </template>

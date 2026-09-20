@@ -141,6 +141,13 @@ export async function saveSuggestions({key, suggestions}){
     for(const [country, entry] of Object.entries(suggestions)){
         updates[`suggestions.${country}`] = entry
     }
+    // Firestore rejects update({}) with "At least one field must be updated".
+    // Zero valid suggestions isn't an error — the model just gave us nothing
+    // usable — so return an empty result rather than touching the document.
+    if(Object.keys(updates).length === 0){
+        return {key, suggestions: {}}
+    }
+    
     await ref.update(updates)
     return {key, suggestions}
 }

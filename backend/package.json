@@ -6,7 +6,12 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "dev": "node --watch --env-file=.env index.js"
+    "dev": "node --watch --env-file=.env index.js",
+    "test": "firebase emulators:exec --only firestore --project demo-config-panel \"vitest run\"",
+    "test:unit": "vitest run tests/unit",
+    "test:watch": "vitest",
+    "test:coverage": "firebase emulators:exec --only firestore --project demo-config-panel \"vitest run --coverage\"",
+    "emulators": "firebase emulators:start --only firestore --project demo-config-panel"
   },
   "keywords": [],
   "author": "",
@@ -15,5 +20,11 @@
     "cors": "^2.8.6",
     "express": "^5.2.1",
     "firebase-admin": "^14.2.0"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^5.0.1",
+    "firebase-tools": "^15.30.2",
+    "supertest": "^7.2.2",
+    "vitest": "^5.0.1"
   }
 }
